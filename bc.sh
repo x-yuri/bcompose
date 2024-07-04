@@ -3,6 +3,7 @@ set -eu
 
 p_project=
 p_dockerfile=
+p_replicas=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --project)
@@ -13,15 +14,20 @@ while [ $# -gt 0 ]; do
             p_dockerfile=$2
             shift 2
             ;;
+        --replicas)
+            p_replicas=$2
+            shift 2
+            ;;
         *) break;;
     esac
 done
 
 start_app_container() {
+    local i=$1
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service=app \
-        -l bcompose-container=app-1 \
+        -l bcompose-container=app-"$i" \
         "$p_project"
 }
 
@@ -38,11 +44,13 @@ case "$1" in
         ;;
 
     up)
-        cid=`cid app app-1`
-        if [ "$cid" ]; then
-            docker stop -- "$cid"
-        fi
-        start_app_container
+        for (( i = 1; i <= "$p_replicas"; i++ )); do
+            cid=`cid app app-"$i"`
+            if [ "$cid" ]; then
+                docker stop -- "$cid"
+            fi
+            start_app_container "$i"
+        done
         ;;
 
     down)
