@@ -2,10 +2,15 @@
 set -eu
 
 p_project=
+p_dockerfile=
 while [ $# -gt 0 ]; do
     case "$1" in
         --project)
             p_project=$2
+            shift 2
+            ;;
+        --dockerfile)
+            p_dockerfile=$2
             shift 2
             ;;
         *) break;;
@@ -29,7 +34,7 @@ cid() {
 
 case "$1" in
     build)
-        docker build -t "$p_project" .
+        docker build -t "$p_project" -f "$p_dockerfile" .
         ;;
 
     up)
