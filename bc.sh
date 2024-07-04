@@ -3,6 +3,7 @@ set -eu
 
 p_project=
 p_dockerfile=
+p_args=()
 p_replicas=1
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -12,6 +13,10 @@ while [ $# -gt 0 ]; do
             ;;
         --dockerfile)
             p_dockerfile=$2
+            shift 2
+            ;;
+        --arg)
+            p_args+=("$2")
             shift 2
             ;;
         --replicas)
@@ -28,6 +33,7 @@ start_app_container() {
         -l bcompose="$p_project" \
         -l bcompose-service=app \
         -l bcompose-container=app-"$i" \
+        "${p_args[@]}" \
         "$p_project"
 }
 
