@@ -45,6 +45,10 @@ cid() {
 }
 
 case "$1" in
+    ps)
+        docker ps -f label=bcompose="$p_project"
+        ;;
+
     build)
         docker build -t "$p_project" -f "$p_dockerfile" .
         ;;
