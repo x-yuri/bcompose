@@ -3,6 +3,7 @@ set -eu
 
 p_project=
 p_dockerfile=
+p_build_args=()
 p_args=()
 p_replicas=1
 while [ $# -gt 0 ]; do
@@ -13,6 +14,10 @@ while [ $# -gt 0 ]; do
             ;;
         --dockerfile)
             p_dockerfile=$2
+            shift 2
+            ;;
+        --build-arg)
+            p_build_args+=("$1" "$2")
             shift 2
             ;;
         --arg)
@@ -50,7 +55,11 @@ case "$1" in
         ;;
 
     build)
-        docker build -t "$p_project" -f "$p_dockerfile" .
+        docker build \
+            -t "$p_project" \
+            -f "$p_dockerfile" \
+            "${p_build_args[@]}" \
+            .
         ;;
 
     up)
