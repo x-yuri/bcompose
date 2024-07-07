@@ -61,8 +61,8 @@ start_app_container() {
         -l bcompose="$p_project" \
         -l bcompose-service=app \
         -l bcompose-container=app-"$i" \
-        "${args[@]}" \
-        "${p_args[@]}" \
+        ${args[@]+"${args[@]}"} \
+        ${p_args[@]+"${p_args[@]}"} \
         "$p_project"
 }
 
@@ -87,7 +87,7 @@ cid() {
     if [ "$container" ]; then
         args+=(-f label=bcompose-container="$container")
     fi
-    docker ps -qf label=bcompose="$p_project" "${args[@]}"
+    docker ps -qf label=bcompose="$p_project" ${args[@]+"${args[@]}"}
 }
 
 get_server_status() {
@@ -110,7 +110,7 @@ get_server_status() {
 
 haproxy_cmd() {
     printf '%s\n' "$1" \
-        | "$0" "${g_args[@]}" exec -i \
+        | "$0" ${g_args[@]+"${g_args[@]}"} exec -i \
             haproxy socat - /var/lib/haproxy/haproxy.sock
 }
 
@@ -123,7 +123,7 @@ case "$1" in
         docker build \
             -t "$p_project" \
             -f "$p_dockerfile" \
-            "${p_build_args[@]}" \
+            ${p_build_args[@]+"${p_build_args[@]}"} \
             .
         ;;
 
@@ -214,7 +214,7 @@ USAGE
         if ! [ "$cid" ]; then
             cid=`cid "$p_name"`
         fi
-        docker exec "${exec_args[@]}" -- "$cid" "$@"
+        docker exec ${exec_args[@]+"${exec_args[@]}"} -- "$cid" "$@"
         ;;
 
     logs)
@@ -261,7 +261,7 @@ USAGE
             if [ "$n_cids" = 0 ]; then
                 :
             elif [ "$n_cids" = 1 ]; then
-                docker logs "${log_args[@]}" -- "$cids"
+                docker logs ${log_args[@]+"${log_args[@]}"} -- "$cids"
             else
                 trap 'tput sgr0; trap INT; kill -2 $$' INT
                 printf '%s\n' "$cids" \
@@ -269,7 +269,7 @@ USAGE
                         i=1
                         while IFS= read -r cid; do
                             ( trap INT
-                            docker logs "${log_args[@]}" -- "$cid" \
+                            docker logs ${log_args[@]+"${log_args[@]}"} -- "$cid" \
                                 |& sed "s/^/`tput setaf "$i"`$cid | /" ) &
                             i=$(( i + 1 ))
                         done
@@ -278,7 +278,10 @@ USAGE
                 tput sgr0
             fi
         else
-            "$0" "${g_args[@]}" logs "${log_args[@]}" -- "${services[@]}"
+            "$0" ${g_args[@]+"${g_args[@]}"} \
+                logs \
+                ${log_args[@]+"${log_args[@]}"} \
+                -- ${services[@]+"${services[@]}"}
         fi
         ;;
 
