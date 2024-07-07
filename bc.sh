@@ -43,10 +43,15 @@ start_app_container() {
 }
 
 cid() {
-    local service=$1 container=$2
-    docker ps -qf label=bcompose="$p_project" \
-        -f label=bcompose-service="$service" \
-        -f label=bcompose-container="$container"
+    local service=$1 container=${2-}
+    local args=()
+    if [ "$service" ]; then
+        args+=(-f label=bcompose-service="$service")
+    fi
+    if [ "$container" ]; then
+        args+=(-f label=bcompose-container="$container")
+    fi
+    docker ps -qf label=bcompose="$p_project" "${args[@]}"
 }
 
 case "$1" in
@@ -77,6 +82,41 @@ case "$1" in
             | while IFS= read -r cid; do
                 docker stop -- "$cid"
             done
+        ;;
+
+    exec)
+        shift
+        exec_args=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -h) cat <<USAGE
+Usage: $0 [ARG...] exec [EXEC_ARG...] [SERVICE|CONTAINER]... COMMAND [ARG...]
+USAGE
+                    exit
+                    ;;
+                --detach-keys | -e | --env | --env-file | -u | --user | -w | --workdir)
+                    exec_args+=("$1" "$2")
+                    shift 2
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    exec_args+=("$1")
+                    shift
+                    ;;
+                *) break;;
+            esac
+        done
+        p_name=$1
+        shift
+
+        cid=`cid '' "$p_name"`
+        if ! [ "$cid" ]; then
+            cid=`cid "$p_name"`
+        fi
+        docker exec "${exec_args[@]}" -- "$cid" "$@"
         ;;
 
     *)
