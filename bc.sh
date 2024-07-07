@@ -1,31 +1,45 @@
 #!/usr/bin/env bash
 set -eu
+g_bc_dir=`dirname -- "$0"`
+g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
 p_project=
 p_dockerfile=
 p_build_args=()
 p_args=()
+p_http=
 p_replicas=1
+g_args=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --project)
             p_project=$2
+            g_args+=("$1" "$2")
             shift 2
             ;;
         --dockerfile)
             p_dockerfile=$2
+            g_args+=("$1" "$2")
             shift 2
             ;;
         --build-arg)
             p_build_args+=("$1" "$2")
+            g_args+=("$1" "$2")
             shift 2
             ;;
         --arg)
             p_args+=("$2")
+            g_args+=("$1" "$2")
             shift 2
+            ;;
+        --http)
+            p_http=1
+            g_args+=("$1")
+            shift
             ;;
         --replicas)
             p_replicas=$2
+            g_args+=("$1" "$2")
             shift 2
             ;;
         *) break;;
@@ -34,12 +48,29 @@ done
 
 start_app_container() {
     local i=$1
+    local args=()
+    if [ "$p_http" ]; then
+        args+=(--network "$p_project" --network-alias app)
+    fi
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service=app \
         -l bcompose-container=app-"$i" \
+        "${args[@]}" \
         "${p_args[@]}" \
         "$p_project"
+}
+
+start_haproxy_container() {
+    docker run -d \
+        -l bcompose="$p_project" \
+        -l bcompose-service=haproxy \
+        -l bcompose-container=haproxy \
+        --network "$p_project" \
+        --network-alias haproxy \
+        -e REPLICAS="$p_replicas" \
+        -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
+        bcompose-haproxy
 }
 
 cid() {
@@ -52,6 +83,30 @@ cid() {
         args+=(-f label=bcompose-container="$container")
     fi
     docker ps -qf label=bcompose="$p_project" "${args[@]}"
+}
+
+get_server_status() {
+    haproxy_cmd 'show stat' \
+        | awk -F, -v server="$1" '
+            NR == 1 {
+                gsub(/^# /, "", $0)
+                split($0, headers, ",")
+                for (i = 1; i in headers; i++) {
+                    if (headers[i] == "svname") svname_idx = i;
+                    if (headers[i] == "status") status_idx = i;
+                    if (headers[i] == "check_status") check_status_idx = i;
+                }
+            }
+            NR > 1 && $svname_idx == server {
+                print $status_idx "|" $check_status_idx
+            }
+        '
+}
+
+haproxy_cmd() {
+    printf '%s\n' "$1" \
+        | "$0" "${g_args[@]}" exec -i \
+            haproxy socat - /var/lib/haproxy/haproxy.sock
 }
 
 case "$1" in
@@ -68,12 +123,46 @@ case "$1" in
         ;;
 
     up)
+        if [ "$p_http" ]; then
+            if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+                docker network create --label bcompose="$p_project" \
+                    -- "$p_project"
+            fi
+
+            if ! [ "`cid haproxy haproxy`" ]; then
+                docker build -t bcompose-haproxy \
+                             -f "$g_bc_dir/Dockerfile-haproxy" \
+                             "$g_bc_dir"
+                start_haproxy_container
+            fi
+        fi
+
         for (( i = 1; i <= "$p_replicas"; i++ )); do
             cid=`cid app app-"$i"`
-            if [ "$cid" ]; then
-                docker stop -- "$cid"
+            if [ "$p_http" ]; then
+                if [ "$cid" ]; then
+                    haproxy_cmd "disable server app/s$i"
+                    docker stop -- "$cid"
+                fi
+
+                start_app_container "$i"
+                haproxy_cmd "enable server app/s$i"
+
+                while true; do
+                    status=`get_server_status "s$i"`
+                    check_status=${status#*|}
+                    status=${status%|*}
+                    if [ "$status" = UP ] && [[ "$check_status" =~ ^L[467]OK$ ]]; then
+                        break
+                    fi
+                    sleep 1
+                done
+            else
+                if [ "$cid" ]; then
+                    docker stop -- "$cid"
+                fi
+                start_app_container "$i"
             fi
-            start_app_container "$i"
         done
         ;;
 
@@ -81,6 +170,10 @@ case "$1" in
         docker ps -qf label=bcompose="$p_project" \
             | while IFS= read -r cid; do
                 docker stop -- "$cid"
+            done
+        docker network ls -qf label=bcompose="$p_project" \
+            | while IFS= read -r nid; do
+                docker network rm "$nid"
             done
         ;;
 
