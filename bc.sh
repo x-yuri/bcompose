@@ -46,6 +46,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+services=(app)
+if [ "$p_http" ]; then
+    services+=(haproxy)
+fi
+
 start_app_container() {
     local i=$1
     local args=()
@@ -210,6 +215,71 @@ USAGE
             cid=`cid "$p_name"`
         fi
         docker exec "${exec_args[@]}" -- "$cid" "$@"
+        ;;
+
+    logs)
+        shift
+        log_args=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -h) cat <<USAGE
+Usage: $0 [ARG...] logs [LOG_ARG...] [SERVICE|CONTAINER]...
+USAGE
+                    exit
+                    ;;
+                --since | -n | --tail | --until)
+                    log_args+=("$1" "$2")
+                    shift 2
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    log_args+=("$1")
+                    shift
+                    ;;
+                *) break;;
+            esac
+        done
+
+        if (( $# )); then
+            cids=$(
+                for t; do
+                    cids=`cid "$t"`
+                    if [ "$cids" = '' ]; then
+                        cids=`cid '' "$t"`
+                    fi
+                    printf '%s\n' "$cids"
+                done
+            )
+            if [ "$cids" = '' ]; then
+                n_cids=0
+            else
+                n_cids=`printf '%s\n' "$cids" | wc -l`
+            fi
+            if [ "$n_cids" = 0 ]; then
+                :
+            elif [ "$n_cids" = 1 ]; then
+                docker logs "${log_args[@]}" -- "$cids"
+            else
+                trap 'tput sgr0; trap INT; kill -2 $$' INT
+                printf '%s\n' "$cids" \
+                    | {
+                        i=1
+                        while IFS= read -r cid; do
+                            ( trap INT
+                            docker logs "${log_args[@]}" -- "$cid" \
+                                |& sed "s/^/`tput setaf "$i"`$cid | /" ) &
+                            i=$(( i + 1 ))
+                        done
+                        wait
+                    }
+                tput sgr0
+            fi
+        else
+            "$0" "${g_args[@]}" logs "${log_args[@]}" -- "${services[@]}"
+        fi
         ;;
 
     *)
