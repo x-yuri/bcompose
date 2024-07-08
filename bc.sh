@@ -81,6 +81,15 @@ while [ $# -gt 0 ]; do
             g_args+=("$1" "$2")
             shift 2
             ;;
+        --same-cmd)
+            if [ "$cur_svc" = p_app ]; then
+                printf '%s\n' "$0: $1 can not be specified for an app" >&2
+                exit 1
+            fi
+            n_cur_svc[cmd]=${p_app[cmd]}
+            g_args+=("$1")
+            shift
+            ;;
         --http)
             if [ "$cur_svc" = p_upstream ]; then
                 printf '%s\n' "$0: $1 can only be specified for an app" >&2
