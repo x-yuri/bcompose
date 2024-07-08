@@ -72,18 +72,19 @@ if [ "${p_app[http]}" ]; then
     services+=(haproxy)
 fi
 
-start_app_container() {
-    local i=$1
-    local -n p_args=${p_app[args]}
+start_svc_container() {
+    [ "$1" = s ] || local -n s=$1
+    local i=$2
+    local -n p_args=${s[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
     if [ "${p_app[http]}" ]; then
-        args+=(--network "$p_project" --network-alias "${p_app[name]}")
+        args+=(--network "$p_project" --network-alias "${s[name]}")
     fi
-    local -n p_cmd=${p_app[cmd]}
+    local -n p_cmd=${s[cmd]}
     docker run -d \
         -l bcompose="$p_project" \
-        -l bcompose-service="${p_app[name]}" \
-        -l bcompose-container="${p_app[name]}-$i" \
+        -l bcompose-service="${s[name]}" \
+        -l bcompose-container="${s[name]}-$i" \
         ${args[@]+"${args[@]}"} \
         "$p_project" \
         ${p_cmd[@]+"${p_cmd[@]}"}
@@ -175,7 +176,7 @@ case "$1" in
                     docker stop -- "$cid"
                 fi
 
-                start_app_container "$i"
+                start_svc_container p_app "$i"
                 haproxy_cmd "enable server ${p_app[name]}/s$i"
 
                 while true; do
@@ -191,7 +192,7 @@ case "$1" in
                 if [ "$cid" ]; then
                     docker stop -- "$cid"
                 fi
-                start_app_container "$i"
+                start_svc_container p_app "$i"
             fi
         done
         ;;
