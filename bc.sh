@@ -7,6 +7,7 @@ p_project=
 p_dockerfile=
 p_build_args=()
 p_args=()
+p_cmd=()
 p_http=
 p_replicas=1
 g_args=()
@@ -29,6 +30,11 @@ while [ $# -gt 0 ]; do
             ;;
         --arg)
             p_args+=("$2")
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --cmd | --cmd-arg)
+            p_cmd+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -63,7 +69,8 @@ start_app_container() {
         -l bcompose-container=app-"$i" \
         ${args[@]+"${args[@]}"} \
         ${p_args[@]+"${p_args[@]}"} \
-        "$p_project"
+        "$p_project" \
+        ${p_cmd[@]+"${p_cmd[@]}"}
 }
 
 start_haproxy_container() {
