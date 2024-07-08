@@ -16,7 +16,8 @@ declare -A p_app=(
     [http]=
     [replicas]=1
 )
-declare -n n_cur_svc=p_app
+cur_svc=p_app
+declare -n n_cur_svc=$cur_svc
 g_args=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -54,14 +55,46 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         --http)
+            if [ "$cur_svc" = p_upstream ]; then
+                printf '%s\n' "$0: $1 can only be specified for an app" >&2
+                exit 1
+            fi
             n_cur_svc[http]=1
             g_args+=("$1")
             shift
             ;;
         --replicas)
+            if [ "$cur_svc" = p_upstream ]; then
+                printf '%s\n' "$0: number of app and upstream replicas should match" >&2
+                exit 1
+            fi
             n_cur_svc[replicas]=$2
             g_args+=("$1" "$2")
             shift 2
+            ;;
+        --upstream)
+            if [ "$cur_svc" = p_upstream ]; then
+                printf '%s\n' "$0: there can be only one upstream" >&2
+                exit 1
+            fi
+            if ! [ "${p_app[http]}" ]; then
+                printf '%s\n' "$0: --upstream expects --http for the app" >&2
+                exit 1
+            fi
+            p_upstream_build_args=()
+            p_upstream_args=()
+            p_upstream_cmd=()
+            declare -A p_upstream=(
+                [name]=upstream
+                [dockerfile]=
+                [build_args]=p_upstream_build_args
+                [args]=p_upstream_args
+                [cmd]=p_upstream_cmd
+            )
+            cur_svc=p_upstream
+            declare -n n_cur_svc=$cur_svc
+            g_args+=("$1")
+            shift
             ;;
         *) break;;
     esac
@@ -70,6 +103,9 @@ done
 services=("${p_app[name]}")
 if [ "${p_app[http]}" ]; then
     services+=(haproxy)
+fi
+if [ -v p_upstream[@] ]; then
+    services+=("${p_upstream[name]}")
 fi
 
 start_svc_container() {
@@ -80,13 +116,19 @@ start_svc_container() {
     if [ "${p_app[http]}" ]; then
         args+=(--network "$p_project" --network-alias "${s[name]}")
     fi
+    local image
+    if [ "${s[name]}" = "${p_app[name]}" ]; then
+        image=$p_project
+    else
+        image=$p_project-${s[name]}
+    fi
     local -n p_cmd=${s[cmd]}
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service="${s[name]}" \
         -l bcompose-container="${s[name]}-$i" \
         ${args[@]+"${args[@]}"} \
-        "$p_project" \
+        "$image" \
         ${p_cmd[@]+"${p_cmd[@]}"}
 }
 
@@ -151,6 +193,15 @@ case "$1" in
             -f "${p_app[dockerfile]}" \
             ${build_args[@]+"${build_args[@]}"} \
             .
+
+        if [ -v p_upstream[@] ]; then
+            declare -n build_args=${p_upstream[build_args]}
+            docker build \
+                -t "$p_project-${p_upstream[name]}" \
+                -f "${p_upstream[dockerfile]}" \
+                ${build_args[@]+"${build_args[@]}"} \
+                .
+        fi
         ;;
 
     up)
@@ -169,13 +220,22 @@ case "$1" in
         fi
 
         for (( i = 1; i <= "${p_app[replicas]}"; i++ )); do
-            cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
             if [ "${p_app[http]}" ]; then
+                haproxy_cmd "disable server ${p_app[name]}/s$i"
+                if [ -v p_upstream[@] ]; then
+                    cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
+                    if [ "$cid" ]; then
+                        docker stop -- "$cid"
+                    fi
+                fi
+                cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                 if [ "$cid" ]; then
-                    haproxy_cmd "disable server ${p_app[name]}/s$i"
                     docker stop -- "$cid"
                 fi
 
+                if [ -v p_upstream[@] ]; then
+                    start_svc_container p_upstream "$i"
+                fi
                 start_svc_container p_app "$i"
                 haproxy_cmd "enable server ${p_app[name]}/s$i"
 
@@ -189,8 +249,19 @@ case "$1" in
                     sleep 1
                 done
             else
+                if [ -v p_upstream[@] ]; then
+                    cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
+                    if [ "$cid" ]; then
+                        docker stop -- "$cid"
+                    fi
+                fi
+                cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                 if [ "$cid" ]; then
                     docker stop -- "$cid"
+                fi
+
+                if [ -v p_upstream[@] ]; then
+                    start_svc_container p_upstream "$i"
                 fi
                 start_svc_container p_app "$i"
             fi
