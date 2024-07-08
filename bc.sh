@@ -51,6 +51,15 @@ while [ $# -gt 0 ]; do
             g_args+=("$1" "$2")
             shift 2
             ;;
+        --same-build-args)
+            if [ "$cur_svc" = p_app ]; then
+                printf '%s\n' "$0: $1 can not be specified for an app" >&2
+                exit 1
+            fi
+            n_cur_svc[build_args]=${p_app[build_args]}
+            g_args+=("$1")
+            shift
+            ;;
         --arg)
             declare -n n_args=${n_cur_svc[args]}
             n_args+=("$2")
