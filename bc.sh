@@ -5,6 +5,7 @@ g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
 p_project=
 p_haproxy_env=()
+p_haproxy_expose=
 p_app_build_args=()
 p_app_args=()
 p_app_cmd=()
@@ -29,6 +30,11 @@ while [ $# -gt 0 ]; do
             ;;
         --haproxy-env)
             p_haproxy_env+=("$2")
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --haproxy-expose)
+            p_haproxy_expose=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -186,6 +192,9 @@ start_haproxy_container() {
     for env in ${p_haproxy_env[@]+"${p_haproxy_env[@]}"}; do
         args+=(-e "$env")
     done
+    if [ "$p_haproxy_expose" ]; then
+        args+=(--expose "$p_haproxy_expose")
+    fi
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service=haproxy \
