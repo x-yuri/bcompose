@@ -66,6 +66,15 @@ while [ $# -gt 0 ]; do
             g_args+=("$1" "$2")
             shift 2
             ;;
+        --same-args)
+            if [ "$cur_svc" = p_app ]; then
+                printf '%s\n' "$0: $1 can not be specified for an app" >&2
+                exit 1
+            fi
+            n_cur_svc[args]=${p_app[args]}
+            g_args+=("$1")
+            shift
+            ;;
         --cmd | --cmd-arg)
             declare -n n_cmd=${n_cur_svc[cmd]}
             n_cmd+=("$2")
