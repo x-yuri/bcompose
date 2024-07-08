@@ -16,6 +16,7 @@ declare -A p_app=(
     [http]=
     [replicas]=1
 )
+declare -n n_cur_svc=p_app
 g_args=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -25,40 +26,40 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         --name)
-            p_app[name]=$2
+            n_cur_svc[name]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
         --dockerfile)
-            p_app[dockerfile]=$2
+            n_cur_svc[dockerfile]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
         --build-arg)
-            declare -n n_build_args=${p_app[build_args]}
+            declare -n n_build_args=${n_cur_svc[build_args]}
             n_build_args+=("$1" "$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --arg)
-            declare -n n_args=${p_app[args]}
+            declare -n n_args=${n_cur_svc[args]}
             n_args+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --cmd | --cmd-arg)
-            declare -n n_cmd=${p_app[cmd]}
+            declare -n n_cmd=${n_cur_svc[cmd]}
             n_cmd+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --http)
-            p_app[http]=1
+            n_cur_svc[http]=1
             g_args+=("$1")
             shift
             ;;
         --replicas)
-            p_app[replicas]=$2
+            n_cur_svc[replicas]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
