@@ -4,12 +4,17 @@ g_bc_dir=`dirname -- "$0"`
 g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
 p_project=
-p_dockerfile=
-p_build_args=()
-p_args=()
-p_cmd=()
-p_http=
-p_replicas=1
+p_app_build_args=()
+p_app_args=()
+p_app_cmd=()
+declare -A p_app=(
+    [dockerfile]=
+    [build_args]=p_app_build_args
+    [args]=p_app_args
+    [cmd]=p_app_cmd
+    [http]=
+    [replicas]=1
+)
 g_args=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -19,32 +24,35 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         --dockerfile)
-            p_dockerfile=$2
+            p_app[dockerfile]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
         --build-arg)
-            p_build_args+=("$1" "$2")
+            declare -n n_build_args=${p_app[build_args]}
+            n_build_args+=("$1" "$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --arg)
-            p_args+=("$2")
+            declare -n n_args=${p_app[args]}
+            n_args+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --cmd | --cmd-arg)
-            p_cmd+=("$2")
+            declare -n n_cmd=${p_app[cmd]}
+            n_cmd+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
         --http)
-            p_http=1
+            p_app[http]=1
             g_args+=("$1")
             shift
             ;;
         --replicas)
-            p_replicas=$2
+            p_app[replicas]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -53,22 +61,23 @@ while [ $# -gt 0 ]; do
 done
 
 services=(app)
-if [ "$p_http" ]; then
+if [ "${p_app[http]}" ]; then
     services+=(haproxy)
 fi
 
 start_app_container() {
     local i=$1
-    local args=()
-    if [ "$p_http" ]; then
+    local -n p_args=${p_app[args]}
+    local args=(${p_args[@]+"${p_args[@]}"})
+    if [ "${p_app[http]}" ]; then
         args+=(--network "$p_project" --network-alias app)
     fi
+    local -n p_cmd=${p_app[cmd]}
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service=app \
         -l bcompose-container=app-"$i" \
         ${args[@]+"${args[@]}"} \
-        ${p_args[@]+"${p_args[@]}"} \
         "$p_project" \
         ${p_cmd[@]+"${p_cmd[@]}"}
 }
@@ -80,7 +89,7 @@ start_haproxy_container() {
         -l bcompose-container=haproxy \
         --network "$p_project" \
         --network-alias haproxy \
-        -e REPLICAS="$p_replicas" \
+        -e REPLICAS="${p_app[replicas]}" \
         -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
         bcompose-haproxy
 }
@@ -127,15 +136,16 @@ case "$1" in
         ;;
 
     build)
+        declare -n build_args=${p_app[build_args]}
         docker build \
             -t "$p_project" \
-            -f "$p_dockerfile" \
-            ${p_build_args[@]+"${p_build_args[@]}"} \
+            -f "${p_app[dockerfile]}" \
+            ${build_args[@]+"${build_args[@]}"} \
             .
         ;;
 
     up)
-        if [ "$p_http" ]; then
+        if [ "${p_app[http]}" ]; then
             if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
                 docker network create --label bcompose="$p_project" \
                     -- "$p_project"
@@ -149,9 +159,9 @@ case "$1" in
             fi
         fi
 
-        for (( i = 1; i <= "$p_replicas"; i++ )); do
+        for (( i = 1; i <= "${p_app[replicas]}"; i++ )); do
             cid=`cid app app-"$i"`
-            if [ "$p_http" ]; then
+            if [ "${p_app[http]}" ]; then
                 if [ "$cid" ]; then
                     haproxy_cmd "disable server app/s$i"
                     docker stop -- "$cid"
