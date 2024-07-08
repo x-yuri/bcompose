@@ -5,6 +5,7 @@ g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
 p_project=
 p_haproxy_env=()
+p_haproxy_network=
 p_haproxy_expose=
 p_app_build_args=()
 p_app_args=()
@@ -30,6 +31,11 @@ while [ $# -gt 0 ]; do
             ;;
         --haproxy-env)
             p_haproxy_env+=("$2")
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --haproxy-network)
+            p_haproxy_network=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -195,7 +201,8 @@ start_haproxy_container() {
     if [ "$p_haproxy_expose" ]; then
         args+=(--expose "$p_haproxy_expose")
     fi
-    docker run -d \
+    local cid
+    cid=`docker create \
         -l bcompose="$p_project" \
         -l bcompose-service=haproxy \
         -l bcompose-container=haproxy \
@@ -205,7 +212,11 @@ start_haproxy_container() {
         -e REPLICAS="${p_app[replicas]}" \
         ${args[@]+"${args[@]}"} \
         -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
-        bcompose-haproxy
+        bcompose-haproxy`
+    if [ "$p_haproxy_network" ]; then
+        docker network connect "$p_haproxy_network" "$cid"
+    fi
+    docker start "$cid"
 }
 
 cid() {
