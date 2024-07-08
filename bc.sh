@@ -145,7 +145,8 @@ if [ -v p_upstream[@] ]; then
 fi
 
 start_svc_container() {
-    [ "$1" = s ] || local -n s=$1
+    local sv=$1
+    [ "$sv" = s ] || local -n s=$sv
     local i=$2
     local -n p_args=${s[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
@@ -157,6 +158,11 @@ start_svc_container() {
         image=$p_project
     else
         image=$p_project-${s[name]}
+    fi
+    if [ "$sv" != p_app ] \
+    && [ "${p_app[dockerfile]}" = "${s[dockerfile]}" ] \
+    && [ "${!p_app[build_args]}" = "${!s[build_args]}" ]; then
+        image=$p_project
     fi
     local -n p_cmd=${s[cmd]}
     docker run -d \
@@ -230,7 +236,9 @@ case "$1" in
             ${build_args[@]+"${build_args[@]}"} \
             .
 
-        if [ -v p_upstream[@] ]; then
+        if [ -v p_upstream[@] ] \
+        && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
+        || [ "${!p_upstream[build_args]}" != "${!p_app[build_args]}" ]; }; then
             declare -n build_args=${p_upstream[build_args]}
             docker build \
                 -t "$p_project-${p_upstream[name]}" \
