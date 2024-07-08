@@ -8,6 +8,7 @@ p_app_build_args=()
 p_app_args=()
 p_app_cmd=()
 declare -A p_app=(
+    [name]=app
     [dockerfile]=
     [build_args]=p_app_build_args
     [args]=p_app_args
@@ -20,6 +21,11 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --project)
             p_project=$2
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --name)
+            p_app[name]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -60,7 +66,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-services=(app)
+services=("${p_app[name]}")
 if [ "${p_app[http]}" ]; then
     services+=(haproxy)
 fi
@@ -70,13 +76,13 @@ start_app_container() {
     local -n p_args=${p_app[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
     if [ "${p_app[http]}" ]; then
-        args+=(--network "$p_project" --network-alias app)
+        args+=(--network "$p_project" --network-alias "${p_app[name]}")
     fi
     local -n p_cmd=${p_app[cmd]}
     docker run -d \
         -l bcompose="$p_project" \
-        -l bcompose-service=app \
-        -l bcompose-container=app-"$i" \
+        -l bcompose-service="${p_app[name]}" \
+        -l bcompose-container="${p_app[name]}-$i" \
         ${args[@]+"${args[@]}"} \
         "$p_project" \
         ${p_cmd[@]+"${p_cmd[@]}"}
@@ -89,6 +95,7 @@ start_haproxy_container() {
         -l bcompose-container=haproxy \
         --network "$p_project" \
         --network-alias haproxy \
+        -e SERVER_NAME="${p_app[name]}" \
         -e REPLICAS="${p_app[replicas]}" \
         -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
         bcompose-haproxy
@@ -160,15 +167,15 @@ case "$1" in
         fi
 
         for (( i = 1; i <= "${p_app[replicas]}"; i++ )); do
-            cid=`cid app app-"$i"`
+            cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
             if [ "${p_app[http]}" ]; then
                 if [ "$cid" ]; then
-                    haproxy_cmd "disable server app/s$i"
+                    haproxy_cmd "disable server ${p_app[name]}/s$i"
                     docker stop -- "$cid"
                 fi
 
                 start_app_container "$i"
-                haproxy_cmd "enable server app/s$i"
+                haproxy_cmd "enable server ${p_app[name]}/s$i"
 
                 while true; do
                     status=`get_server_status "s$i"`
