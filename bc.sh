@@ -4,6 +4,7 @@ g_bc_dir=`dirname -- "$0"`
 g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
 p_project=
+p_haproxy_env=()
 p_app_build_args=()
 p_app_args=()
 p_app_cmd=()
@@ -23,6 +24,11 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --project)
             p_project=$2
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --haproxy-env)
+            p_haproxy_env+=("$2")
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -175,6 +181,11 @@ start_svc_container() {
 }
 
 start_haproxy_container() {
+    local args=()
+    local env
+    for env in ${p_haproxy_env[@]+"${p_haproxy_env[@]}"}; do
+        args+=(-e "$env")
+    done
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service=haproxy \
@@ -183,6 +194,7 @@ start_haproxy_container() {
         --network-alias haproxy \
         -e SERVER_NAME="${p_app[name]}" \
         -e REPLICAS="${p_app[replicas]}" \
+        ${args[@]+"${args[@]}"} \
         -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
         bcompose-haproxy
 }
