@@ -236,6 +236,9 @@ start_svc_container() {
             args+=(--network-alias "${s[name]}-$i")
         fi
     fi
+    if [ "$i" ]; then
+        args+=(-e i="$i")
+    fi
     local image
     image=`svc_image "$sv"`
     local -n p_cmd=${s[cmd]}
