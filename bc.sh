@@ -289,6 +289,28 @@ svc_image() {
     printf '%s\n' "$image"
 }
 
+svc_by_name() {
+    local n=$1
+    if [ "${p_app[name]}" = "$n" ]; then
+        echo p_app
+        return
+    fi
+    if [ -v p_upstream[@] ] && [ "${p_upstream[name]}" = "$n" ]; then
+        echo p_upstream
+        return
+    fi
+    if (( `array_size p_more_services` )); then
+        local sv
+        for sv in ${p_more_services[@]+"${p_more_services[@]}"}; do
+            declare -n s=$sv
+            if [ "${s[name]}" = "$n" ]; then
+                printf '%s\n' "$sv"
+                return
+            fi
+        done
+    fi
+}
+
 cid() {
     local service=$1 container=${2-}
     local args=()
@@ -491,6 +513,39 @@ USAGE
             cid=`cid "$p_name"`
         fi
         docker exec ${exec_args[@]+"${exec_args[@]}"} -- "$cid" "$@"
+        ;;
+
+    run)
+        shift
+        run_args=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -h) cat <<USAGE
+Usage: $0 [ARG...] run [RUN_ARG...] SERVICE COMMAND [ARG...]
+USAGE
+                    exit
+                    ;;
+                --add-host | -a | --attach | --blkio-weight | --blkio-weight-device | --cap-add | --cap-drop | --cgroup-parent | --cidfile | --cpu-period | --cpu-quota | --cpu-rt-period | --cpu-rt-runtime | -c | --cpu-shares | --cpus | --cpuset-cpus | --cpuset-mems | --detach-keys | --device | --device-cgroup-rule | --device-read-bps | --device-read-iops | --device-write-bps | --device-write-iops | --dns | --dns-option | --dns-search | --entrypoint | -e | --env | --env-file | --expose | --group-add | --health-cmd | --health-interval | --health-retries | --health-start-period | --health-timeout | -h | --hostname | --ip | --ip6 | --ipc | --isolation | --kernel-memory | -l | --label | --label-file | --link | --link-local-ip | --log-driver | --log-opt | --mac-address | -m | --memory | --memory-reservation | --memory-swap | --memory-swappiness | --mount | --name | --network | --network-alias | --oom-score-adj | --pid | --pids-limit | -p | --publish | --restart | --runtime | --security-opt | --shm-size | --stop-signal | --stop-timeout | --storage-opt | --sysctl | --tmpfs | --ulimit | -u | --user | --userns | --uts | -v | --volume | --volume-driver | --volumes-from | -w | --workdir)
+                    run_args+=("$1" "$2")
+                    shift 2
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    run_args+=("$1")
+                    shift
+                    ;;
+                *) break;;
+            esac
+        done
+        p_service=$1
+        shift
+
+        sv=`svc_by_name "$p_service"`
+        image=`svc_image "$sv"`
+        docker run ${run_args[@]+"${run_args[@]}"} "$image" "$@"
         ;;
 
     logs)
