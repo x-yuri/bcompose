@@ -221,7 +221,10 @@ case "$1" in
 
         for (( i = 1; i <= "${p_app[replicas]}"; i++ )); do
             if [ "${p_app[http]}" ]; then
-                haproxy_cmd "disable server ${p_app[name]}/s$i"
+                r=`haproxy_cmd "disable server ${p_app[name]}/s$i"`
+                if [ "$r" ]; then
+                    printf '%s\n' "$r"
+                fi
                 if [ -v p_upstream[@] ]; then
                     cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
                     if [ "$cid" ]; then
@@ -237,7 +240,10 @@ case "$1" in
                     start_svc_container p_upstream "$i"
                 fi
                 start_svc_container p_app "$i"
-                haproxy_cmd "enable server ${p_app[name]}/s$i"
+                r=`haproxy_cmd "enable server ${p_app[name]}/s$i"`
+                if [ "$r" ]; then
+                    printf '%s\n' "$r"
+                fi
 
                 while true; do
                     status=`get_server_status "s$i"`
