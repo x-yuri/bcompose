@@ -12,6 +12,7 @@ p_app_args=()
 p_app_cmd=()
 declare -A p_app=(
     [name]=app
+    [context]=.
     [dockerfile]=
     [build_args]=p_app_build_args
     [args]=p_app_args
@@ -48,6 +49,20 @@ while [ $# -gt 0 ]; do
             n_cur_svc[name]=$2
             g_args+=("$1" "$2")
             shift 2
+            ;;
+        --context)
+            n_cur_svc[context]=$2
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --same-context)
+            if [ "$cur_svc" = p_app ]; then
+                printf '%s\n' "$0: $1 can not be specified for an app" >&2
+                exit 1
+            fi
+            n_cur_svc[context]=${p_app[context]}
+            g_args+=("$1")
+            shift
             ;;
         --dockerfile)
             n_cur_svc[dockerfile]=$2
@@ -140,6 +155,7 @@ while [ $# -gt 0 ]; do
             p_upstream_cmd=()
             declare -A p_upstream=(
                 [name]=upstream
+                [context]=.
                 [dockerfile]=
                 [build_args]=p_upstream_build_args
                 [args]=p_upstream_args
@@ -266,7 +282,7 @@ case "$1" in
             -t "$p_project" \
             -f "${p_app[dockerfile]}" \
             ${build_args[@]+"${build_args[@]}"} \
-            .
+            "${p_app[context]}"
 
         if [ -v p_upstream[@] ] \
         && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
@@ -276,7 +292,7 @@ case "$1" in
                 -t "$p_project-${p_upstream[name]}" \
                 -f "${p_upstream[dockerfile]}" \
                 ${build_args[@]+"${build_args[@]}"} \
-                .
+                "${p_upstream[context]}"
         fi
         ;;
 
