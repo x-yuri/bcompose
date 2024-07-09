@@ -518,12 +518,17 @@ USAGE
     run)
         shift
         run_args=()
+        p_needs=()
         while [ $# -gt 0 ]; do
             case "$1" in
                 -h) cat <<USAGE
 Usage: $0 [ARG...] run [RUN_ARG...] SERVICE COMMAND [ARG...]
 USAGE
                     exit
+                    ;;
+                --needs)
+                    p_needs+=("$2")
+                    shift 2
                     ;;
                 --add-host | -a | --attach | --blkio-weight | --blkio-weight-device | --cap-add | --cap-drop | --cgroup-parent | --cidfile | --cpu-period | --cpu-quota | --cpu-rt-period | --cpu-rt-runtime | -c | --cpu-shares | --cpus | --cpuset-cpus | --cpuset-mems | --detach-keys | --device | --device-cgroup-rule | --device-read-bps | --device-read-iops | --device-write-bps | --device-write-iops | --dns | --dns-option | --dns-search | --entrypoint | -e | --env | --env-file | --expose | --group-add | --health-cmd | --health-interval | --health-retries | --health-start-period | --health-timeout | -h | --hostname | --ip | --ip6 | --ipc | --isolation | --kernel-memory | -l | --label | --label-file | --link | --link-local-ip | --log-driver | --log-opt | --mac-address | -m | --memory | --memory-reservation | --memory-swap | --memory-swappiness | --mount | --name | --network | --network-alias | --oom-score-adj | --pid | --pids-limit | -p | --publish | --restart | --runtime | --security-opt | --shm-size | --stop-signal | --stop-timeout | --storage-opt | --sysctl | --tmpfs | --ulimit | -u | --user | --userns | --uts | -v | --volume | --volume-driver | --volumes-from | -w | --workdir)
                     run_args+=("$1" "$2")
@@ -543,9 +548,38 @@ USAGE
         p_service=$1
         shift
 
+        args=()
+        if (( `array_size p_needs` )); then
+            args+=(--network "$p_project")
+            if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+                docker network create --label bcompose="$p_project" \
+                    -- "$p_project"
+            fi
+        fi
+
+        for sn in ${p_needs[@]+"${p_needs[@]}"}; do
+            sv=`svc_by_name "$sn"`
+            declare -n s=$sv
+            if [ "${s[name]}" = "${p_app[name]}" ]; then
+                printf '%s\n' "$0: can't need app" >&2
+                exit 1
+            fi
+            if [ -v p_upstream[@] ] \
+            && [ "${s[name]}" = "${p_upstream[name]}" ]; then
+                printf '%s\n' "$0: can't need upstream" >&2
+                exit 1
+            fi
+            cid=`cid "${s[name]}" "${s[name]}"`
+            if ! [ "$cid" ]; then
+                start_svc_container "$sv"
+            fi
+        done
+
         sv=`svc_by_name "$p_service"`
         image=`svc_image "$sv"`
-        docker run ${run_args[@]+"${run_args[@]}"} "$image" "$@"
+        docker run ${run_args[@]+"${run_args[@]}"} \
+            ${args[@]+"${args[@]}"} \
+            "$image" "$@"
         ;;
 
     logs)
