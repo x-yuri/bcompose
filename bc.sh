@@ -367,6 +367,13 @@ haproxy_cmd() {
             haproxy socat - /var/lib/haproxy/haproxy.sock
 }
 
+h() {
+    echo
+    tput setaf 3
+    printf '> %s\n' "$*"
+    tput sgr0
+}
+
 case "$1" in
     ps)
         docker ps -f label=bcompose="$p_project"
@@ -410,6 +417,7 @@ case "$1" in
     up)
         if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
             if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+                h create network
                 docker network create --label bcompose="$p_project" \
                     -- "$p_project"
             fi
@@ -420,6 +428,7 @@ case "$1" in
                 declare -n s=$sv
                 cid=`cid "${s[name]}" "${s[name]}"`
                 if ! [ "$cid" ]; then
+                    h "start ${s[name]}"
                     start_svc_container "$sv"
                 fi
             done
@@ -430,36 +439,48 @@ case "$1" in
                 docker build -t bcompose-haproxy \
                              -f "$g_bc_dir/Dockerfile-haproxy" \
                              "$g_bc_dir"
+                h start haproxy
                 start_haproxy_container
             fi
         fi
 
         for (( i = 1; i <= "${p_app[replicas]}"; i++ )); do
             if [ "${p_app[http]}" ]; then
+                h "disable ${p_app[name]}-$i"
                 r=`haproxy_cmd "disable server ${p_app[name]}/s$i"`
                 if [ "$r" ]; then
                     printf '%s\n' "$r"
                 fi
+
                 if [ -v p_upstream[@] ]; then
                     cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
                     if [ "$cid" ]; then
+                        h "stop ${p_upstream[name]}-$i"
                         docker stop -- "$cid"
                     fi
                 fi
+
                 cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                 if [ "$cid" ]; then
+                    h "stop ${p_app[name]}-$i"
                     docker stop -- "$cid"
                 fi
 
                 if [ -v p_upstream[@] ]; then
+                    h "start ${p_upstream[name]}-$i"
                     start_svc_container p_upstream "$i"
                 fi
+
+                h "start ${p_app[name]}-$i"
                 start_svc_container p_app "$i"
+
+                h "enable ${p_app[name]}-$i"
                 r=`haproxy_cmd "enable server ${p_app[name]}/s$i"`
                 if [ "$r" ]; then
                     printf '%s\n' "$r"
                 fi
 
+                h wait for status up
                 while true; do
                     status=`get_server_status "s$i"`
                     check_status=${status#*|}
@@ -473,17 +494,23 @@ case "$1" in
                 if [ -v p_upstream[@] ]; then
                     cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
                     if [ "$cid" ]; then
+                        h "stop ${p_upstream[name]}-$i"
                         docker stop -- "$cid"
                     fi
                 fi
+
                 cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                 if [ "$cid" ]; then
+                    h "stop ${p_app[name]}-$i"
                     docker stop -- "$cid"
                 fi
 
                 if [ -v p_upstream[@] ]; then
+                    h "start ${p_upstream[name]}-$i"
                     start_svc_container p_upstream "$i"
                 fi
+
+                h "start ${p_app[name]}-$i"
                 start_svc_container p_app "$i"
             fi
         done
