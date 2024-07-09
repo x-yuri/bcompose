@@ -3,6 +3,15 @@ set -eu
 g_bc_dir=`dirname -- "$0"`
 g_bc_dir=`cd -- "$g_bc_dir"; pwd`
 
+array_size() {
+    [ "$1" = a ] || local -n a=$1
+    if declare -p "$1" >/dev/null 2>&1; then
+        echo ${#a[@]}
+    else
+        echo 0
+    fi
+}
+
 p_project=
 p_haproxy_env=()
 p_haproxy_network=
@@ -20,6 +29,7 @@ declare -A p_app=(
     [http]=
     [replicas]=1
 )
+p_more_services=()
 cur_svc=p_app
 declare -n n_cur_svc=$cur_svc
 g_args=()
@@ -137,6 +147,10 @@ while [ $# -gt 0 ]; do
                 printf '%s\n' "$0: number of app and upstream replicas should match" >&2
                 exit 1
             fi
+            if [ "$cur_svc" != p_app ]; then
+                printf '%s\n' "$0: number of replicas can only be specified for an app" >&2
+                exit 1
+            fi
             n_cur_svc[replicas]=$2
             g_args+=("$1" "$2")
             shift 2
@@ -166,6 +180,32 @@ while [ $# -gt 0 ]; do
             g_args+=("$1")
             shift
             ;;
+        --service)
+            i=$(( `array_size p_more_services` + 1 ))
+            cur_svc=p_service_$i
+            declare -A $cur_svc
+            declare -n n_cur_svc=$cur_svc
+            p_more_services+=($cur_svc)
+
+            n_cur_svc[name]=
+            n_cur_svc[context]=.
+            n_cur_svc[dockerfile]=
+
+            build_args_array_name=p_service_${i}_build_args
+            eval "$build_args_array_name=()"
+            n_cur_svc[build_args]=$build_args_array_name
+
+            args_array_name=p_service_${i}_args
+            eval "$args_array_name=()"
+            n_cur_svc[args]=$args_array_name
+
+            cmd_array_name=p_service_${i}_cmd
+            eval "$cmd_array_name=()"
+            n_cur_svc[cmd]=$cmd_array_name
+
+            g_args+=("$1")
+            shift
+            ;;
         *) break;;
     esac
 done
@@ -177,14 +217,20 @@ fi
 if [ -v p_upstream[@] ]; then
     services+=("${p_upstream[name]}")
 fi
+if (( `array_size p_more_services` )); then
+    declare -n s
+    for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
+        services+=("${s[name]}")
+    done
+fi
 
 start_svc_container() {
     local sv=$1
     [ "$sv" = s ] || local -n s=$sv
-    local i=$2
+    local i=${2-}
     local -n p_args=${s[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
-    if [ "${p_app[http]}" ]; then
+    if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
         args+=(--network "$p_project" --network-alias "${s[name]}")
     fi
     local image
@@ -202,7 +248,7 @@ start_svc_container() {
     docker run -d \
         -l bcompose="$p_project" \
         -l bcompose-service="${s[name]}" \
-        -l bcompose-container="${s[name]}-$i" \
+        -l bcompose-container="${s[name]}${i:+-"$i"}" \
         ${args[@]+"${args[@]}"} \
         "$image" \
         ${p_cmd[@]+"${p_cmd[@]}"}
@@ -294,15 +340,42 @@ case "$1" in
                 ${build_args[@]+"${build_args[@]}"} \
                 "${p_upstream[context]}"
         fi
+
+        if (( `array_size p_more_services` )); then
+            declare -n s
+            for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
+                if { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
+                || [ "${!s[build_args]}" != "${!p_app[build_args]}" ]; }; then
+                    declare -n build_args=${s[build_args]}
+                    docker build \
+                        -t "$p_project-${s[name]}" \
+                        -f "${s[dockerfile]}" \
+                        ${build_args[@]+"${build_args[@]}"} \
+                        "${s[context]}"
+                fi
+            done
+        fi
         ;;
 
     up)
-        if [ "${p_app[http]}" ]; then
+        if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
             if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
                 docker network create --label bcompose="$p_project" \
                     -- "$p_project"
             fi
+        fi
 
+        if (( `array_size p_more_services` )); then
+            for sv in ${p_more_services[@]+"${p_more_services[@]}"}; do
+                declare -n s=$sv
+                cid=`cid "${s[name]}" "${s[name]}"`
+                if ! [ "$cid" ]; then
+                    start_svc_container "$sv"
+                fi
+            done
+        fi
+
+        if [ "${p_app[http]}" ]; then
             if ! [ "`cid haproxy haproxy`" ]; then
                 docker build -t bcompose-haproxy \
                              -f "$g_bc_dir/Dockerfile-haproxy" \
