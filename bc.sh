@@ -234,16 +234,7 @@ start_svc_container() {
         args+=(--network "$p_project" --network-alias "${s[name]}")
     fi
     local image
-    if [ "${s[name]}" = "${p_app[name]}" ]; then
-        image=$p_project
-    else
-        image=$p_project-${s[name]}
-    fi
-    if [ "$sv" != p_app ] \
-    && [ "${p_app[dockerfile]}" = "${s[dockerfile]}" ] \
-    && [ "${!p_app[build_args]}" = "${!s[build_args]}" ]; then
-        image=$p_project
-    fi
+    image=`svc_image "$sv"`
     local -n p_cmd=${s[cmd]}
     docker run -d \
         -l bcompose="$p_project" \
@@ -279,6 +270,23 @@ start_haproxy_container() {
         docker network connect "$p_haproxy_network" "$cid"
     fi
     docker start "$cid"
+}
+
+svc_image() {
+    local sv=$1
+    [ "$sv" = s ] || local -n s=$sv
+    local image
+    if [ "${s[name]}" = "${p_app[name]}" ]; then
+        image=$p_project
+    else
+        image=$p_project-${s[name]}
+    fi
+    if [ "$sv" != p_app ] \
+    && [ "${p_app[dockerfile]}" = "${s[dockerfile]}" ] \
+    && [ "${!p_app[build_args]}" = "${!s[build_args]}" ]; then
+        image=$p_project
+    fi
+    printf '%s\n' "$image"
 }
 
 cid() {
