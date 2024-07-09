@@ -232,6 +232,9 @@ start_svc_container() {
     local args=(${p_args[@]+"${p_args[@]}"})
     if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
         args+=(--network "$p_project" --network-alias "${s[name]}")
+        if [ "$i" ]; then
+            args+=(--network-alias "${s[name]}-$i")
+        fi
     fi
     local image
     image=`svc_image "$sv"`
