@@ -107,7 +107,7 @@ while [ $# -gt 0 ]; do
             declare -n n_args=${n_cur_svc[args]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --cmd-arg | --same-cmd | --http | --replicas | --upstream | --service)
+                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --upstream | --service)
                         break
                         ;;
                     --args) g_args+=("$1"); shift;;
@@ -125,11 +125,18 @@ while [ $# -gt 0 ]; do
             g_args+=("$1")
             shift
             ;;
-        --cmd | --cmd-arg)
+        --cmd)
             declare -n n_cmd=${n_cur_svc[cmd]}
-            n_cmd+=("$2")
-            g_args+=("$1" "$2")
-            shift 2
+            while [ $# -gt 0 ]; do
+                case "$1" in
+                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --upstream | --service)
+                        break
+                        ;;
+                    --cmd) g_args+=("$1"); shift;;
+                    --) g_args+=("$1"); shift; break;;
+                    *) n_cmd+=("$1"); g_args+=("$1"); shift;;
+                esac
+            done
             ;;
         --same-cmd)
             if [ "$cur_svc" = p_app ]; then
