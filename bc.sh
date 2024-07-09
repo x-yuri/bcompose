@@ -256,13 +256,17 @@ start_svc_container() {
     local image
     image=`svc_image "$sv"`
     local -n p_cmd=${s[cmd]}
-    docker run -d \
-        -l bcompose="$p_project" \
-        -l bcompose-service="${s[name]}" \
-        -l bcompose-container="${s[name]}${i:+-"$i"}" \
-        ${args[@]+"${args[@]}"} \
-        "$image" \
+    local cmd=(
+        docker run -d
+        -l bcompose="$p_project"
+        -l bcompose-service="${s[name]}"
+        -l bcompose-container="${s[name]}${i:+-"$i"}"
+        ${args[@]+"${args[@]}"}
+        "$image"
         ${p_cmd[@]+"${p_cmd[@]}"}
+    )
+    c "${cmd[@]}"
+    "${cmd[@]}"
 }
 
 start_haproxy_container() {
@@ -274,18 +278,22 @@ start_haproxy_container() {
     if [ "$p_haproxy_expose" ]; then
         args+=(--expose "$p_haproxy_expose")
     fi
+    local cmd=(
+        docker create
+        -l bcompose="$p_project"
+        -l bcompose-service=haproxy
+        -l bcompose-container=haproxy
+        --network "$p_project"
+        --network-alias haproxy
+        -e SERVER_NAME="${p_app[name]}"
+        -e REPLICAS="${p_app[replicas]}"
+        ${args[@]+"${args[@]}"}
+        -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+        bcompose-haproxy
+    )
+    c "${cmd[@]}"
     local cid
-    cid=`docker create \
-        -l bcompose="$p_project" \
-        -l bcompose-service=haproxy \
-        -l bcompose-container=haproxy \
-        --network "$p_project" \
-        --network-alias haproxy \
-        -e SERVER_NAME="${p_app[name]}" \
-        -e REPLICAS="${p_app[replicas]}" \
-        ${args[@]+"${args[@]}"} \
-        -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
-        bcompose-haproxy`
+    cid=`"${cmd[@]}"`
     if [ "$p_haproxy_network" ]; then
         docker network connect "$p_haproxy_network" "$cid"
     fi
@@ -371,6 +379,12 @@ h() {
     echo
     tput setaf 3
     printf '> %s\n' "$*"
+    tput sgr0
+}
+
+c() {
+    tput setaf 8
+    printf '$ %s\n' "$*"
     tput sgr0
 }
 
@@ -624,9 +638,13 @@ USAGE
 
         sv=`svc_by_name "$p_service"`
         image=`svc_image "$sv"`
-        docker run ${run_args[@]+"${run_args[@]}"} \
-            ${args[@]+"${args[@]}"} \
+        cmd=(
+            docker run ${run_args[@]+"${run_args[@]}"}
+            ${args[@]+"${args[@]}"}
             "$image" "$@"
+        )
+        c "${cmd[@]}"
+        "${cmd[@]}"
         ;;
 
     logs)
