@@ -107,7 +107,7 @@ while [ $# -gt 0 ]; do
             declare -n n_args=${n_cur_svc[args]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --upstream | --service)
+                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --args) g_args+=("$1"); shift;;
@@ -129,7 +129,7 @@ while [ $# -gt 0 ]; do
             declare -n n_cmd=${n_cur_svc[cmd]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --upstream | --service)
+                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --cmd) g_args+=("$1"); shift;;
@@ -169,6 +169,19 @@ while [ $# -gt 0 ]; do
             g_args+=("$1" "$2")
             shift 2
             ;;
+        --restart-on-up)
+            if [ "$cur_svc" = p_app ]; then
+                printf '%s\n' "$0: $1 can not be specified for an app" >&2
+                exit 1
+            fi
+            if [ "$cur_svc" = p_upstream ]; then
+                printf '%s\n' "$0: $1 can not be specified for upstream" >&2
+                exit 1
+            fi
+            n_cur_svc[restart_on_up]=1
+            g_args+=("$1")
+            shift
+            ;;
         --upstream)
             if [ "$cur_svc" = p_upstream ]; then
                 printf '%s\n' "$0: there can be only one upstream" >&2
@@ -204,6 +217,7 @@ while [ $# -gt 0 ]; do
             n_cur_svc[name]=
             n_cur_svc[context]=.
             n_cur_svc[dockerfile]=
+            n_cur_svc[restart_on_up]=
 
             build_args_array_name=p_service_${i}_build_args
             eval "$build_args_array_name=()"
@@ -440,10 +454,21 @@ case "$1" in
         if (( `array_size p_more_services` )); then
             for sv in ${p_more_services[@]+"${p_more_services[@]}"}; do
                 declare -n s=$sv
-                cid=`cid "${s[name]}" "${s[name]}"`
-                if ! [ "$cid" ]; then
+                if [ "${s[restart_on_up]}" ]; then
+                    cid=`cid "${s[name]}" "${s[name]}"`
+                    if [ "$cid" ]; then
+                        h "stop ${s[name]}"
+                        docker stop -- "$cid"
+                    fi
+
                     h "start ${s[name]}"
                     start_svc_container "$sv"
+                else
+                    cid=`cid "${s[name]}" "${s[name]}"`
+                    if ! [ "$cid" ]; then
+                        h "start ${s[name]}"
+                        start_svc_container "$sv"
+                    fi
                 fi
             done
         fi
