@@ -410,36 +410,48 @@ case "$1" in
     build)
         h "build $p_project"
         declare -n build_args=${p_app[build_args]}
-        docker build \
-            -t "$p_project" \
-            -f "${p_app[dockerfile]}" \
-            ${build_args[@]+"${build_args[@]}"} \
+        cmd=(
+            docker build
+            -t "$p_project"
+            -f "${p_app[dockerfile]}"
+            ${build_args[@]+"${build_args[@]}"}
             "${p_app[context]}"
+        )
+        c "${cmd[@]}"
+        "${cmd[@]}"
 
         if [ -v p_upstream[@] ] \
         && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
         || [ "${!p_upstream[build_args]}" != "${!p_app[build_args]}" ]; }; then
             h "build $p_project-${p_upstream[name]}"
             declare -n build_args=${p_upstream[build_args]}
-            docker build \
-                -t "$p_project-${p_upstream[name]}" \
-                -f "${p_upstream[dockerfile]}" \
-                ${build_args[@]+"${build_args[@]}"} \
+            cmd=(
+                docker build
+                -t "$p_project-${p_upstream[name]}"
+                -f "${p_upstream[dockerfile]}"
+                ${build_args[@]+"${build_args[@]}"}
                 "${p_upstream[context]}"
+            )
+            c "${cmd[@]}"
+            "${cmd[@]}"
         fi
 
         if (( `array_size p_more_services` )); then
             declare -n s
             for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
                 if { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
-                || [ "${!s[build_args]}" != "${!p_app[build_args]}" ]; }; then
+                || [ "${!s[build_args]}" != "${p_app[build_args]}" ]; }; then
                     h "build $p_project-${s[name]}"
                     declare -n build_args=${s[build_args]}
-                    docker build \
-                        -t "$p_project-${s[name]}" \
-                        -f "${s[dockerfile]}" \
-                        ${build_args[@]+"${build_args[@]}"} \
+                    cmd=(
+                        docker build
+                        -t "$p_project-${s[name]}"
+                        -f "${s[dockerfile]}"
+                        ${build_args[@]+"${build_args[@]}"}
                         "${s[context]}"
+                    )
+                    c "${cmd[@]}"
+                    "${cmd[@]}"
                 fi
             done
         fi
