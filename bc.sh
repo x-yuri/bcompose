@@ -419,6 +419,28 @@ case "$1" in
         docker ps -f label=bcompose="$p_project"
         ;;
 
+    pull)
+        if [ "${p_app[image]}" ]; then
+            h "pull ${p_app[image]}"
+            docker pull -- "${p_app[image]}"
+        fi
+
+        if [ -v p_upstream[@] ] && [ "${p_upstream[image]}" ]; then
+            h "pull ${p_upstream[image]}"
+            docker pull -- "${p_upstream[image]}"
+        fi
+
+        if (( `array_size p_more_services` )); then
+            declare -n s
+            for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
+                if [ "${s[image]}" ]; then
+                    h "pull ${s[image]}"
+                    docker pull -- "${s[image]}"
+                fi
+            done
+        fi
+        ;;
+
     build)
         if ! [ "${p_app[image]}" ]; then
             h "build $p_project"
