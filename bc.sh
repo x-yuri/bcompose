@@ -21,6 +21,7 @@ p_app_args=()
 p_app_cmd=()
 declare -A p_app=(
     [name]=app
+    [image]=
     [context]=.
     [dockerfile]=
     [build_args]=p_app_build_args
@@ -57,6 +58,11 @@ while [ $# -gt 0 ]; do
             ;;
         --name)
             n_cur_svc[name]=$2
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
+        --image)
+            n_cur_svc[image]=$2
             g_args+=("$1" "$2")
             shift 2
             ;;
@@ -107,7 +113,7 @@ while [ $# -gt 0 ]; do
             declare -n n_args=${n_cur_svc[args]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --args) g_args+=("$1"); shift;;
@@ -129,7 +135,7 @@ while [ $# -gt 0 ]; do
             declare -n n_cmd=${n_cur_svc[cmd]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --cmd) g_args+=("$1"); shift;;
@@ -196,6 +202,7 @@ while [ $# -gt 0 ]; do
             p_upstream_cmd=()
             declare -A p_upstream=(
                 [name]=upstream
+                [image]=
                 [context]=.
                 [dockerfile]=
                 [build_args]=p_upstream_build_args
@@ -215,6 +222,7 @@ while [ $# -gt 0 ]; do
             p_more_services+=($cur_svc)
 
             n_cur_svc[name]=
+            n_cur_svc[image]=
             n_cur_svc[context]=.
             n_cur_svc[dockerfile]=
             n_cur_svc[restart_on_up]=
@@ -317,6 +325,10 @@ start_haproxy_container() {
 svc_image() {
     local sv=$1
     [ "$sv" = s ] || local -n s=$sv
+    if [ "${s[image]}" ]; then
+        printf '%s\n' "${s[image]}"
+        return
+    fi
     local image
     if [ "${s[name]}" = "${p_app[name]}" ]; then
         image=$p_project
@@ -408,19 +420,22 @@ case "$1" in
         ;;
 
     build)
-        h "build $p_project"
-        declare -n build_args=${p_app[build_args]}
-        cmd=(
-            docker build
-            -t "$p_project"
-            -f "${p_app[dockerfile]}"
-            ${build_args[@]+"${build_args[@]}"}
-            "${p_app[context]}"
-        )
-        c "${cmd[@]}"
-        "${cmd[@]}"
+        if ! [ "${p_app[image]}" ]; then
+            h "build $p_project"
+            declare -n build_args=${p_app[build_args]}
+            cmd=(
+                docker build
+                -t "$p_project"
+                -f "${p_app[dockerfile]}"
+                ${build_args[@]+"${build_args[@]}"}
+                "${p_app[context]}"
+            )
+            c "${cmd[@]}"
+            "${cmd[@]}"
+        fi
 
         if [ -v p_upstream[@] ] \
+        && ! [ "${p_upstream[image]}" ] \
         && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
         || [ "${!p_upstream[build_args]}" != "${!p_app[build_args]}" ]; }; then
             h "build $p_project-${p_upstream[name]}"
@@ -439,8 +454,9 @@ case "$1" in
         if (( `array_size p_more_services` )); then
             declare -n s
             for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
-                if { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
-                || [ "${!s[build_args]}" != "${p_app[build_args]}" ]; }; then
+                if ! [ "${s[image]}" ] \
+                && { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
+                || [ "${!s[build_args]}" != "${!p_app[build_args]}" ]; }; then
                     h "build $p_project-${s[name]}"
                     declare -n build_args=${s[build_args]}
                     cmd=(
