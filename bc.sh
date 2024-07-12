@@ -26,6 +26,7 @@ declare -A p_app=(
     [dockerfile]=
     [build_args]=p_app_build_args
     [args]=p_app_args
+    [external_network]=
     [cmd]=p_app_cmd
     [http]=
     [replicas]=1
@@ -113,7 +114,7 @@ while [ $# -gt 0 ]; do
             declare -n n_args=${n_cur_svc[args]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --external-network | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --args) g_args+=("$1"); shift;;
@@ -131,11 +132,16 @@ while [ $# -gt 0 ]; do
             g_args+=("$1")
             shift
             ;;
+        --external-network)
+            n_cur_svc[external_network]=$2
+            g_args+=("$1" "$2")
+            shift 2
+            ;;
         --cmd)
             declare -n n_cmd=${n_cur_svc[cmd]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --external-network | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
                         break
                         ;;
                     --cmd) g_args+=("$1"); shift;;
@@ -207,6 +213,7 @@ while [ $# -gt 0 ]; do
                 [dockerfile]=
                 [build_args]=p_upstream_build_args
                 [args]=p_upstream_args
+                [external_network]=
                 [cmd]=p_upstream_cmd
             )
             cur_svc=p_upstream
@@ -225,6 +232,7 @@ while [ $# -gt 0 ]; do
             n_cur_svc[image]=
             n_cur_svc[context]=.
             n_cur_svc[dockerfile]=
+            n_cur_svc[external_network]=
             n_cur_svc[restart_on_up]=
 
             build_args_array_name=p_service_${i}_build_args
@@ -291,6 +299,9 @@ start_svc_container() {
     "${cmd[@]}"
     local cid
     cid=`"${cmd[@]}"`
+    if [ "${s[external_network]}" ]; then
+        docker network connect "${s[external_network]}" "$cid"
+    fi
     docker start "$cid"
 }
 
