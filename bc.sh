@@ -279,7 +279,7 @@ start_svc_container() {
     image=`svc_image "$sv"`
     local -n p_cmd=${s[cmd]}
     local cmd=(
-        docker run -d
+        docker create
         -l bcompose="$p_project"
         -l bcompose-service="${s[name]}"
         -l bcompose-container="${s[name]}${i:+-"$i"}"
@@ -289,6 +289,9 @@ start_svc_container() {
     )
     c "${cmd[@]}"
     "${cmd[@]}"
+    local cid
+    cid=`"${cmd[@]}"`
+    docker start "$cid"
 }
 
 start_haproxy_container() {
