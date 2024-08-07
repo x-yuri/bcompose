@@ -509,7 +509,7 @@ case "$1" in
 
     up)
         if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
-            h create network
+            h create network "$p_project"
             docker network create --label bcompose="$p_project" \
                 -- "$p_project"
         fi
