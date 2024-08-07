@@ -613,6 +613,7 @@ USAGE
         if (( `array_size p_needs` )); then
             args+=(--network "$p_project")
             if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+                h create network "$p_project"
                 docker network create --label bcompose="$p_project" \
                     -- "$p_project"
             fi
@@ -632,12 +633,14 @@ USAGE
             fi
             cid=`cid "${s[name]}" "${s[name]}"`
             if ! [ "$cid" ]; then
+                h "start ${s[name]}"
                 start_svc_container "$sv"
             fi
         done
 
         sv=`svc_by_name "$p_service"`
         image=`svc_image "$sv"`
+        h run
         cmd=(
             docker run ${run_args[@]+"${run_args[@]}"}
             ${args[@]+"${args[@]}"}
