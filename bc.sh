@@ -274,11 +274,9 @@ start_svc_container() {
     local i=${2-}
     local -n p_args=${s[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
-    if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
-        args+=(--network "$p_project" --network-alias "${s[name]}")
-        if [ "$i" ]; then
-            args+=(--network-alias "${s[name]}-$i")
-        fi
+    args+=(--network "$p_project" --network-alias "${s[name]}")
+    if [ "$i" ]; then
+        args+=(--network-alias "${s[name]}-$i")
     fi
     if [ "$i" ]; then
         args+=(-e i="$i")
@@ -510,12 +508,10 @@ case "$1" in
         ;;
 
     up)
-        if [ "${p_app[http]}" ] || (( `array_size p_more_services` )); then
-            if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
-                h create network "$p_project"
-                docker network create --label bcompose="$p_project" \
-                    -- "$p_project"
-            fi
+        if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+            h create network "$p_project"
+            docker network create --label bcompose="$p_project" \
+                -- "$p_project"
         fi
 
         if (( `array_size p_more_services` )); then
@@ -701,14 +697,11 @@ USAGE
         p_service=$1
         shift
 
-        args=()
-        if (( `array_size p_needs` )); then
-            args+=(--network "$p_project")
-            if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
-                h create network "$p_project"
-                docker network create --label bcompose="$p_project" \
-                    -- "$p_project"
-            fi
+        args=(--network "$p_project")
+        if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
+            h create network "$p_project"
+            docker network create --label bcompose="$p_project" \
+                -- "$p_project"
         fi
 
         for sn in ${p_needs[@]+"${p_needs[@]}"}; do
