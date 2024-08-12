@@ -428,7 +428,8 @@ c() {
 
 case "$1" in
     ps)
-        docker ps -f label=bcompose="$p_project"
+        shift
+        docker ps -f label=bcompose="$p_project" "$@"
         ;;
 
     pull)
