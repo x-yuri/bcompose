@@ -526,6 +526,16 @@ case "$1" in
         ;;
 
     up)
+        shift
+        detach=
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -d | --detach) detach=1; shift;;
+                *) printf "%s: unknown option (%s)" "$0" "$1" >&2
+                    exit 1;;
+            esac
+        done
+
         if ! [ "`docker network ls -qf label=bcompose="$p_project"`" ]; then
             h create network "$p_project"
             docker network create --label bcompose="$p_project" \
@@ -634,6 +644,11 @@ case "$1" in
                 start_svc_container p_app "$i"
             fi
         done
+
+        if ! [ "$detach" ]; then
+            "$0" ${g_args[@]+"${g_args[@]}"} \
+                logs -f
+        fi
         ;;
 
     down)
