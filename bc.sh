@@ -433,10 +433,19 @@ case "$1" in
         while [ $# -gt 0 ]; do
             case "$1" in
                 -q | --quiet) args+=("$1"); shift;;
-                *) printf "%s: unknown option (%s)" "$0" "$1" >&2
+                --) shift; break;;
+                -*) printf "%s: unknown option (%s)" "$0" "$1" >&2
                     exit 1;;
+                *) break;;
             esac
         done
+        if [ $# -gt 1 ]; then
+            printf "%s: filtering by several services is not supported" "$0" >&2
+            exit 1
+        fi
+        if [ $# -eq 1 ]; then
+            args+=(-f label=bcompose-service="$1")
+        fi
         docker ps -f label=bcompose="$p_project" "${args[@]}"
         ;;
 
