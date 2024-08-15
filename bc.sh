@@ -429,7 +429,15 @@ c() {
 case "$1" in
     ps)
         shift
-        docker ps -f label=bcompose="$p_project" "$@"
+        args=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -q | --quiet) args+=("$1"); shift;;
+                *) printf "%s: unknown option (%s)" "$0" "$1" >&2
+                    exit 1;;
+            esac
+        done
+        docker ps -f label=bcompose="$p_project" "${args[@]}"
         ;;
 
     pull)
