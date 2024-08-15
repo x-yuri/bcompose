@@ -531,6 +531,7 @@ case "$1" in
         while [ $# -gt 0 ]; do
             case "$1" in
                 -d | --detach) detach=1; shift;;
+                --force-recreate) shift;;
                 *) printf "%s: unknown option (%s)" "$0" "$1" >&2
                     exit 1;;
             esac
