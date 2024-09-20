@@ -254,6 +254,20 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+if [ ! "$p_project" ]; then
+    printf '%s\n' "$0: specifying the project name (--project) is mandatory" >&2
+    exit 1
+fi
+if (( `array_size p_more_services` )); then
+    declare -n s
+    for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
+        if [ ! "${s[name]}" ]; then
+            printf '%s\n' "$0: each service should have a name (--name)" >&2
+            exit 1
+        fi
+    done
+fi
+
 services=("${p_app[name]}")
 if [ "${p_app[http]}" ]; then
     services+=(haproxy)
