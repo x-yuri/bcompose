@@ -288,9 +288,11 @@ start_svc_container() {
     local i=${2-}
     local -n p_args=${s[args]}
     local args=(${p_args[@]+"${p_args[@]}"})
-    args+=(--network "$p_project" --network-alias "${s[name]}")
-    if [ "$i" ]; then
-        args+=(--network-alias "${s[name]}-$i")
+    if ! has_network_arg ${args[@]+"${args[@]}"}; then
+        args+=(--network "$p_project" --network-alias "${s[name]}")
+        if [ "$i" ]; then
+            args+=(--network-alias "${s[name]}-$i")
+        fi
     fi
     if [ "$i" ]; then
         args+=(-e i="$i")
@@ -315,6 +317,24 @@ start_svc_container() {
         docker network connect "${s[external_network]}" "$cid"
     fi
     docker start "$cid"
+}
+
+has_network_arg() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --network | --network=*)
+                return 0;;
+            --add-host | --annotation | -a | --attach | --blkio-weight | --blkio-weight-device | --cap-add | --cap-drop | --cgroup-parent | --cgroupns | --cidfile | --cpu-period | --cpu-quota | --cpu-rt-period | --cpu-rt-runtime | -c | --cpu-shares | --cpus | --cpuset-cpus | --cpuset-mems | --detach-keys | --device | --device-cgroup-rule | --device-read-bps | --device-read-iops | --device-write-bps | --device-write-iops | --dns | --dns-option | --dns-search | --domainname | --entrypoint | -e | --env | --env-file | --expose | --gpus | --group-add | --health-cmd | --health-interval | --health-retries | --health-start-interval | --health-start-period | --health-timeout | -h | --hostname | --ip | --ip6 | --ipc | --isolation | --kernel-memory | -l | --label | --label-file | --link | --link-local-ip | --log-driver | --log-opt | --mac-address | -m | --memory | --memory-reservation | --memory-swap | --memory-swappiness | --mount | --name | --network-alias | --oom-score-adj | --pid | --pids-limit | --platform | -p | --publish | --pull | --restart | --runtime | --security-opt | --shm-size | --stop-signal | --stop-timeout | --storage-opt | --sysctl | --tmpfs | --ulimit | -u | --user | --userns | --uts | -v | --volume | --volume-driver | --volumes-from | -w | --workdir)
+                shift 2;;
+            --add-host=* | --annotation=* | -a=* | --attach=* | --blkio-weight=* | --blkio-weight-device=* | --cap-add=* | --cap-drop=* | --cgroup-parent=* | --cgroupns=* | --cidfile=* | --cpu-period=* | --cpu-quota=* | --cpu-rt-period=* | --cpu-rt-runtime=* | -c=* | --cpu-shares=* | --cpus=* | --cpuset-cpus=* | --cpuset-mems=* | --detach-keys=* | --device=* | --device-cgroup-rule=* | --device-read-bps=* | --device-read-iops=* | --device-write-bps=* | --device-write-iops=* | --dns=* | --dns-option=* | --dns-search=* | --domainname=* | --entrypoint=* | -e=* | --env=* | --env-file=* | --expose=* | --gpus=* | --group-add=* | --health-cmd=* | --health-interval=* | --health-retries=* | --health-start-interval=* | --health-start-period=* | --health-timeout=* | -h=* | --hostname=* | --ip=* | --ip6=* | --ipc=* | --isolation=* | --kernel-memory=* | -l=* | --label=* | --label-file=* | --link=* | --link-local-ip=* | --log-driver=* | --log-opt=* | --mac-address=* | -m=* | --memory=* | --memory-reservation=* | --memory-swap=* | --memory-swappiness=* | --mount=* | --name=* | --network-alias=* | --oom-score-adj=* | --pid=* | --pids-limit=* | --platform=* | -p=* | --publish=* | --pull=* | --restart=* | --runtime=* | --security-opt=* | --shm-size=* | --stop-signal=* | --stop-timeout=* | --storage-opt=* | --sysctl=* | --tmpfs=* | --ulimit=* | -u=* | --user=* | --userns=* | --uts=* | -v=* | --volume=* | --volume-driver=* | --volumes-from=* | -w=* | --workdir=*)
+                shift;;
+            -d | --detach | --disable-content-trust | --init | -i | --interactive | --no-healthcheck | --oom-kill-disable | --privileged | -P | --publish-all | -q | --quiet | --read-only | --rm | --sig-proxy | -t | --tty)
+                shift;;
+            *) printf '%s\n' "$0: unknown option ($1)" >&2
+                exit 1;;
+        esac
+    done
+    return 1
 }
 
 start_haproxy_container() {
