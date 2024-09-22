@@ -310,7 +310,6 @@ start_svc_container() {
         ${p_cmd[@]+"${p_cmd[@]}"}
     )
     c "${cmd[@]}"
-    "${cmd[@]}"
     local cid
     cid=`"${cmd[@]}"`
     if [ "${s[external_network]}" ]; then
