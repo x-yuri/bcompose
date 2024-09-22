@@ -309,9 +309,9 @@ start_svc_container() {
         "$image"
         ${p_cmd[@]+"${p_cmd[@]}"}
     )
-    c "${cmd[@]}"
+    c ${cmd[@]+"${cmd[@]}"}
     local cid
-    cid=`"${cmd[@]}"`
+    cid=`${cmd[@]+"${cmd[@]}"}`
     if [ "${s[external_network]}" ]; then
         docker network connect "${s[external_network]}" "$cid"
     fi
@@ -358,9 +358,9 @@ start_haproxy_container() {
         -v "$g_bc_dir"/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
         bcompose-haproxy
     )
-    c "${cmd[@]}"
+    c ${cmd[@]+"${cmd[@]}"}
     local cid
-    cid=`"${cmd[@]}"`
+    cid=`${cmd[@]+"${cmd[@]}"}`
     if [ "$p_haproxy_network" ]; then
         docker network connect "$p_haproxy_network" "$cid"
     fi
@@ -479,7 +479,7 @@ case "$1" in
         if [ $# -eq 1 ]; then
             args+=(-f label=bcompose-service="$1")
         fi
-        docker ps -f label=bcompose="$p_project" "${args[@]}"
+        docker ps -f label=bcompose="$p_project" ${args[@]+"${args[@]}"}
         ;;
 
     pull)
@@ -515,8 +515,8 @@ case "$1" in
                 ${build_args[@]+"${build_args[@]}"}
                 "${p_app[context]}"
             )
-            c "${cmd[@]}"
-            "${cmd[@]}"
+            c ${cmd[@]+"${cmd[@]}"}
+            ${cmd[@]+"${cmd[@]}"}
         fi
 
         if [ -v p_upstream[@] ] \
@@ -532,8 +532,8 @@ case "$1" in
                 ${build_args[@]+"${build_args[@]}"}
                 "${p_upstream[context]}"
             )
-            c "${cmd[@]}"
-            "${cmd[@]}"
+            c ${cmd[@]+"${cmd[@]}"}
+            ${cmd[@]+"${cmd[@]}"}
         fi
 
         if (( `array_size p_more_services` )); then
@@ -551,8 +551,8 @@ case "$1" in
                         ${build_args[@]+"${build_args[@]}"}
                         "${s[context]}"
                     )
-                    c "${cmd[@]}"
-                    "${cmd[@]}"
+                    c ${cmd[@]+"${cmd[@]}"}
+                    ${cmd[@]+"${cmd[@]}"}
                 fi
             done
         fi
@@ -798,8 +798,8 @@ USAGE
             ${args[@]+"${args[@]}"}
             "$image" "$@"
         )
-        c "${cmd[@]}"
-        "${cmd[@]}"
+        c ${cmd[@]+"${cmd[@]}"}
+        ${cmd[@]+"${cmd[@]}"}
         ;;
 
     logs)
