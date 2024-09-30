@@ -389,6 +389,7 @@ svc_image() {
         image=$p_project-${s[name]}
     fi
     if [ "$sv" != p_app ] \
+    && ! [ "${p_app[image]}" ] \
     && [ "${p_app[dockerfile]}" = "${s[dockerfile]}" ] \
     && arrays_equal "${p_app[build_args]}" "${s[build_args]}"; then
         image=$p_project
@@ -529,8 +530,11 @@ case "$1" in
 
         if [ -v p_upstream[@] ] \
         && ! [ "${p_upstream[image]}" ] \
-        && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
-        || ! arrays_equal "${p_upstream[build_args]}" "${p_app[build_args]}"; }; then
+        && {
+            [ "${p_app[image]}" ] \
+            || [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
+            || ! arrays_equal "${p_upstream[build_args]}" "${p_app[build_args]}"
+        }; then
             h "build $p_project-${p_upstream[name]}"
             declare -n build_args=${p_upstream[build_args]}
             cmd=(
@@ -548,8 +552,11 @@ case "$1" in
             declare -n s
             for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
                 if ! [ "${s[image]}" ] \
-                && { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
-                || ! arrays_equal "${s[build_args]}" "${p_app[build_args]}"; }; then
+                && {
+                    [ "${p_app[image]}" ] \
+                    || [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
+                    || ! arrays_equal "${s[build_args]}" "${p_app[build_args]}"
+                }; then
                     h "build $p_project-${s[name]}"
                     declare -n build_args=${s[build_args]}
                     cmd=(
