@@ -12,6 +12,14 @@ array_size() {
     fi
 }
 
+arrays_equal() {
+    [ "$1" = a ] || local -n a=$1
+    [ "$2" = b ] || local -n b=$2
+    (( ${#a[@]} == ${#b[@]} )) || return 1
+    [ "$(printf '%s\n' "${a[@]}" | sort)" \
+        = "$(printf '%s\n' "${b[@]}" | sort)" ]
+}
+
 p_project=
 p_haproxy_env=()
 p_haproxy_network=
@@ -382,7 +390,7 @@ svc_image() {
     fi
     if [ "$sv" != p_app ] \
     && [ "${p_app[dockerfile]}" = "${s[dockerfile]}" ] \
-    && [ "${!p_app[build_args]}" = "${!s[build_args]}" ]; then
+    && arrays_equal "${p_app[build_args]}" "${s[build_args]}"; then
         image=$p_project
     fi
     printf '%s\n' "$image"
@@ -522,7 +530,7 @@ case "$1" in
         if [ -v p_upstream[@] ] \
         && ! [ "${p_upstream[image]}" ] \
         && { [ "${p_upstream[dockerfile]}" != "${p_app[dockerfile]}" ] \
-        || [ "${!p_upstream[build_args]}" != "${!p_app[build_args]}" ]; }; then
+        || ! arrays_equal "${p_upstream[build_args]}" "${p_app[build_args]}"; }; then
             h "build $p_project-${p_upstream[name]}"
             declare -n build_args=${p_upstream[build_args]}
             cmd=(
@@ -541,7 +549,7 @@ case "$1" in
             for s in ${p_more_services[@]+"${p_more_services[@]}"}; do
                 if ! [ "${s[image]}" ] \
                 && { [ "${s[dockerfile]}" != "${p_app[dockerfile]}" ] \
-                || [ "${!s[build_args]}" != "${!p_app[build_args]}" ]; }; then
+                || ! arrays_equal "${s[build_args]}" "${p_app[build_args]}"; }; then
                     h "build $p_project-${s[name]}"
                     declare -n build_args=${s[build_args]}
                     cmd=(
