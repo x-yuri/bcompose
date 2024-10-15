@@ -20,6 +20,18 @@ arrays_equal() {
         = "$(printf '%s\n' "${b[@]}" | sort)" ]
 }
 
+in_array() {
+    local needle=$1
+    shift
+    local el
+    for el; do
+        if [ "$el" = "$needle" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 p_project=
 p_haproxy_env=()
 p_haproxy_network=
@@ -588,8 +600,7 @@ case "$1" in
             case "$1" in
                 -d | --detach) detach=1; shift;;
                 --force-recreate) shift;;
-                *) printf "%s: unknown option (%s)" "$0" "$1" >&2
-                    exit 1;;
+                *) break;;
             esac
         done
 
@@ -602,6 +613,9 @@ case "$1" in
         if (( `array_size p_more_services` )); then
             for sv in ${p_more_services[@]+"${p_more_services[@]}"}; do
                 declare -n s=$sv
+                if (( $# > 0 )) && ! in_array "${s[name]}" "$@"; then
+                    continue
+                fi
                 if [ "${s[restart_on_up]}" ]; then
                     cid=`cid "${s[name]}" "${s[name]}"`
                     if [ "$cid" ]; then
@@ -621,6 +635,7 @@ case "$1" in
             done
         fi
 
+        if (( $# == 0 )) || in_array "${p_app[name]}" "$@"; then
             if [ "${p_app[http]}" ]; then
                 if ! [ "`cid haproxy haproxy`" ]; then
                     docker build -t bcompose-haproxy \
@@ -701,6 +716,7 @@ case "$1" in
                     start_svc_container p_app "$i"
                 fi
             done
+        fi
 
         if ! [ "$detach" ]; then
             "$0" ${g_args[@]+"${g_args[@]}"} \
