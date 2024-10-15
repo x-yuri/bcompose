@@ -127,7 +127,15 @@ while [ $# -gt 0 ]; do
                         ;;
                     --args) g_args+=("$1"); shift;;
                     --) g_args+=("$1"); shift; break;;
-                    *) n_args+=("$1"); g_args+=("$1"); shift;;
+                    *)
+                        arg=$1
+                        if [[ $arg = \\* ]]; then
+                            arg=${arg:1}
+                        fi
+                        n_args+=("$arg")
+                        g_args+=("$arg")
+                        shift
+                        ;;
                 esac
             done
             ;;
