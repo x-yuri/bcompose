@@ -50,6 +50,7 @@ declare -A p_app=(
     [cmd]=p_app_cmd
     [http]=
     [replicas]=1
+    [dont_restart_on_up]=
 )
 p_more_services=()
 cur_svc=p_app
@@ -134,7 +135,7 @@ while [ $# -gt 0 ]; do
             declare -n n_args=${n_cur_svc[args]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --external-network | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --same-args | --external-network | --cmd | --same-cmd | --http | --replicas | --restart-on-up | --dont-restart-on-up | --upstream | --service)
                         break
                         ;;
                     --args) g_args+=("$1"); shift;;
@@ -169,7 +170,7 @@ while [ $# -gt 0 ]; do
             declare -n n_cmd=${n_cur_svc[cmd]}
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --external-network | --same-cmd | --http | --replicas | --restart-on-up | --upstream | --service)
+                    --name | --image | --context | --same-context | --dockerfile | --same-dockerfile | --build-arg | --same-build-args | --args | --same-args | --external-network | --same-cmd | --http | --replicas | --restart-on-up | --dont-restart-on-up | --upstream | --service)
                         break
                         ;;
                     --cmd) g_args+=("$1"); shift;;
@@ -219,6 +220,15 @@ while [ $# -gt 0 ]; do
                 exit 1
             fi
             n_cur_svc[restart_on_up]=1
+            g_args+=("$1")
+            shift
+            ;;
+        --dont-restart-on-up)
+            if [ "$cur_svc" != p_app ]; then
+                printf '%s\n' "$0: $1 can only be specified for the app" >&2
+                exit 1
+            fi
+            n_cur_svc[dont_restart_on_up]=1
             g_args+=("$1")
             shift
             ;;
@@ -635,7 +645,8 @@ case "$1" in
             done
         fi
 
-        if (( $# == 0 )) || in_array "${p_app[name]}" "$@"; then
+        if { (( $# == 0 )) || in_array "${p_app[name]}" "$@"; } \
+        && ! [ "${p_app[dont_restart_on_up]}" ]; then
             if [ "${p_app[http]}" ]; then
                 if ! [ "`cid haproxy haproxy`" ]; then
                     docker build -t bcompose-haproxy \
