@@ -630,6 +630,7 @@ case "$1" in
                     cid=`cid "${s[name]}" "${s[name]}"`
                     if [ "$cid" ]; then
                         h "stop ${s[name]}"
+                        docker update --restart no -- "$cid"
                         docker stop -- "$cid"
                     fi
 
@@ -669,6 +670,7 @@ case "$1" in
                         cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
                         if [ "$cid" ]; then
                             h "stop ${p_upstream[name]}-$i"
+                            docker update --restart no -- "$cid"
                             docker stop -- "$cid"
                         fi
                     fi
@@ -676,6 +678,7 @@ case "$1" in
                     cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                     if [ "$cid" ]; then
                         h "stop ${p_app[name]}-$i"
+                        docker update --restart no -- "$cid"
                         docker stop -- "$cid"
                     fi
 
@@ -708,6 +711,7 @@ case "$1" in
                         cid=`cid "${p_upstream[name]}" "${p_upstream[name]}-$i"`
                         if [ "$cid" ]; then
                             h "stop ${p_upstream[name]}-$i"
+                            docker update --restart no -- "$cid"
                             docker stop -- "$cid"
                         fi
                     fi
@@ -715,6 +719,7 @@ case "$1" in
                     cid=`cid "${p_app[name]}" "${p_app[name]}-$i"`
                     if [ "$cid" ]; then
                         h "stop ${p_app[name]}-$i"
+                        docker update --restart no -- "$cid"
                         docker stop -- "$cid"
                     fi
 
@@ -738,6 +743,7 @@ case "$1" in
     down)
         docker ps -qf label=bcompose="$p_project" \
             | while IFS= read -r cid; do
+                docker update --restart no -- "$cid"
                 docker stop -- "$cid"
             done
         docker network ls -qf label=bcompose="$p_project" \
